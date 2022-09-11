@@ -12,11 +12,12 @@ import (
 var _ Client = &client{}
 
 type client struct {
-	buffer     []byte
-	conn       net.Conn
-	keyFactory crypto.KeyFactory
-	secretKey  aes.Key
-	targetAddr string
+	buffer         []byte
+	conn           net.Conn
+	keyFactory     crypto.KeyFactory
+	secretKey      aes.Key
+	targetAddr     string
+	receiveHandler ReceiveHandler
 }
 
 func (c client) GetId() string {
@@ -28,6 +29,7 @@ func NewClient(
 	targetAddr string,
 	keyFactory crypto.KeyFactory,
 	sessionManager SessionManager,
+	receiveHandler ReceiveHandler,
 ) (Client, error) {
 
 	logger.Debug("connecting to:", targetAddr)
@@ -43,7 +45,12 @@ func NewClient(
 		return nil, err
 	}
 
-	client, err := makeClient(targetAddr, conn, keyFactory)
+	client, err := makeClient(
+		targetAddr,
+		conn,
+		keyFactory,
+		receiveHandler,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +76,18 @@ func NewClient(
 	return client, nil
 }
 
-func makeClient(targetAddr string, conn net.Conn, keyFactory crypto.KeyFactory) (*client, error) {
+func makeClient(
+	targetAddr string,
+	conn net.Conn,
+	keyFactory crypto.KeyFactory,
+	receiveHandler ReceiveHandler,
+) (*client, error) {
 	client := &client{
-		conn:       conn,
-		buffer:     make([]byte, 1024),
-		keyFactory: keyFactory,
-		targetAddr: targetAddr,
+		conn:           conn,
+		buffer:         make([]byte, 1024),
+		keyFactory:     keyFactory,
+		targetAddr:     targetAddr,
+		receiveHandler: receiveHandler,
 	}
 
 	secretKey, err := keyFactory.GenerateAesSecretKey()

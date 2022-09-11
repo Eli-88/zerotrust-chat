@@ -22,12 +22,12 @@ func NewBuilder(serverAddr string) Builder {
 	}
 }
 
-func (b builder) NewServer() chat.Server {
-	return chat.NewServer(b.serverAddr, b.sessionManager, b.cryptoKeyFactory)
+func (b builder) NewServer(receiveHandler chat.ReceiveHandler) chat.Server {
+	return chat.NewServer(b.serverAddr, b.sessionManager, b.cryptoKeyFactory, receiveHandler)
 }
 
-func (b builder) NewClient(targetAddr string) (chat.Client, error) {
-	return chat.NewClient(b.serverAddr, targetAddr, b.cryptoKeyFactory, b.sessionManager)
+func (b builder) NewClient(targetAddr string, receiveHandler chat.ReceiveHandler) (chat.Client, error) {
+	return chat.NewClient(b.serverAddr, targetAddr, b.cryptoKeyFactory, b.sessionManager, receiveHandler)
 }
 
 func (b builder) GetSessionManager() chat.SessionManager {

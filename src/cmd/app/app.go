@@ -11,22 +11,48 @@ import (
 	"zerotrust_chat/logger"
 )
 
+var _ chat.ReceiveHandler = &printer{}
+
 type App struct {
 	builder        builder.Builder
 	sessionManager chat.SessionManager
 	server         chat.Server
+	printer        *printer
+}
+
+type printer struct {
+	msgChan chan string
+}
+
+func newPrinter() *printer {
+	return &printer{
+		msgChan: make(chan string, 1),
+	}
+}
+
+func (p *printer) OnReceive(msg string) {
+	p.msgChan <- msg
+}
+
+func (p *printer) Run() {
+	for {
+		msg := <-p.msgChan
+		fmt.Println(msg)
+	}
 }
 
 func NewApp(builder builder.Builder) App {
+	printer := newPrinter()
 	return App{
 		builder:        builder,
 		sessionManager: builder.GetSessionManager(),
-		server:         builder.NewServer(),
+		server:         builder.NewServer(printer),
+		printer:        printer,
 	}
 }
 
 func (a *App) Connect(addr string) error {
-	client, err := a.builder.NewClient(addr)
+	client, err := a.builder.NewClient(addr, a.printer)
 	if err != nil {
 		logger.Error(err)
 		return err
@@ -51,6 +77,10 @@ func (a *App) Run() {
 		a.server.Run()
 	}()
 
+	go func() {
+		a.printer.Run()
+	}()
+
 	scanner := bufio.NewScanner(os.Stdin)
 
 	currId := ""
@@ -69,7 +99,7 @@ func (a *App) Run() {
 			currId = s[1]
 			fmt.Println("connecting to:", currId)
 
-			_, err := a.builder.NewClient(currId)
+			_, err := a.builder.NewClient(currId, a.printer)
 			if err != nil {
 				logger.Debug(err)
 				continue

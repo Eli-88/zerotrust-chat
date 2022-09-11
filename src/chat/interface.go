@@ -21,3 +21,7 @@ type Client interface {
 	Read() (string, error)
 	Session
 }
+
+type ReceiveHandler interface {
+	OnReceive(string)
+}

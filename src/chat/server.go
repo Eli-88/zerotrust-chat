@@ -2,7 +2,6 @@ package chat
 
 import (
 	"encoding/json"
-	"fmt"
 	"net"
 	"zerotrust_chat/crypto"
 	"zerotrust_chat/crypto/aes"
@@ -14,9 +13,10 @@ var _ Server = &server{}
 var _ Session = &session{}
 
 type server struct {
-	ipAddr         string
-	sessionManager SessionManager
-	keyFactory     crypto.KeyFactory
+	ipAddr          string
+	sessionManager  SessionManager
+	keyFactory      crypto.KeyFactory
+	receiverHandler ReceiveHandler
 }
 
 type session struct {
@@ -26,17 +26,24 @@ type session struct {
 	keyFactory     crypto.KeyFactory
 	secretKey      aes.Key
 	sessionManager SessionManager
+	receiveHandler ReceiveHandler
 }
 
 func (s session) GetId() string {
 	return s.id
 }
 
-func NewServer(ipAddr string, sessionManager SessionManager, keyFactory crypto.KeyFactory) Server {
+func NewServer(
+	ipAddr string,
+	sessionManager SessionManager,
+	keyFactory crypto.KeyFactory,
+	receiveHandler ReceiveHandler,
+) Server {
 	return &server{
-		ipAddr:         ipAddr,
-		sessionManager: sessionManager,
-		keyFactory:     keyFactory,
+		ipAddr:          ipAddr,
+		sessionManager:  sessionManager,
+		keyFactory:      keyFactory,
+		receiverHandler: receiveHandler,
 	}
 }
 
@@ -58,7 +65,12 @@ func (s server) Run() error {
 }
 
 func (s server) onConnection(conn net.Conn) {
-	session := NewSession(conn, s.keyFactory, s.sessionManager)
+	session := NewSession(
+		conn,
+		s.keyFactory,
+		s.sessionManager,
+		s.receiverHandler,
+	)
 	err := session.run() // blocking run, return when connection closes
 	if err != nil {
 		logger.Error(err)
@@ -67,7 +79,12 @@ func (s server) onConnection(conn net.Conn) {
 	s.sessionManager.Remove(session.GetId()) // remove session once it returns
 }
 
-func NewSession(conn net.Conn, keyFactory crypto.KeyFactory, sessionManager SessionManager) *session {
+func NewSession(
+	conn net.Conn,
+	keyFactory crypto.KeyFactory,
+	sessionManager SessionManager,
+	receiveHandler ReceiveHandler,
+) *session {
 	return &session{
 		id:             "",
 		conn:           conn,
@@ -75,6 +92,7 @@ func NewSession(conn net.Conn, keyFactory crypto.KeyFactory, sessionManager Sess
 		keyFactory:     keyFactory,
 		secretKey:      nil,
 		sessionManager: sessionManager,
+		receiveHandler: receiveHandler,
 	}
 }
 
@@ -106,7 +124,7 @@ func (s *session) run() error {
 			logger.Debug(err)
 			break
 		}
-		fmt.Println("recv:", string(data))
+		s.receiveHandler.OnReceive(string(data))
 	}
 
 	return nil
