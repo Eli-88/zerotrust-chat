@@ -124,7 +124,9 @@ func (s *session) run() error {
 			logger.Debug(err)
 			break
 		}
-		s.receiveHandler.OnReceive(string(data))
+		dataCpy := make([]byte, len(data))
+		copy(dataCpy, data)
+		s.receiveHandler.OnReceive(string(dataCpy))
 	}
 
 	return nil

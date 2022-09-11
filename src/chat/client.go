@@ -62,16 +62,18 @@ func NewClient(
 
 	sessionManager.Add(client)
 
-	go func(c Client) {
+	go func() {
 		for {
-			msg, err := c.Read()
+			msg, err := client.Read()
 			if err != nil {
 				logger.Debug(err)
 				break
 			}
-			println("recv:", msg) // TODO: implement observer pattern here to notify all subscriber
+			msgCpy := make([]byte, len(msg))
+			copy(msgCpy, msg)
+			client.receiveHandler.OnReceive(string(msgCpy))
 		}
-	}(client)
+	}()
 
 	return client, nil
 }
