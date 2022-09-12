@@ -25,3 +25,12 @@ type Client interface {
 type ReceiveHandler interface {
 	OnReceive(string)
 }
+
+type HandshakeConn interface {
+	Read(b []byte) (n int, err error)
+	Write(b []byte) (n int, err error)
+}
+
+type HandShake interface {
+	Handshake() error
+}
