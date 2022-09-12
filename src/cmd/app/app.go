@@ -11,48 +11,31 @@ import (
 	"zerotrust_chat/logger"
 )
 
-var _ chat.ReceiveHandler = &printer{}
+var _ chat.ReceiveHandler = &App{}
 
 type App struct {
 	builder        builder.Builder
 	sessionManager chat.SessionManager
 	server         chat.Server
-	printer        *printer
+	printer        chan string
 }
 
-type printer struct {
-	msgChan chan string
+func (a *App) OnReceive(msg string) {
+	a.printer <- msg
 }
 
-func newPrinter() *printer {
-	return &printer{
-		msgChan: make(chan string, 1),
-	}
-}
-
-func (p *printer) OnReceive(msg string) {
-	p.msgChan <- msg
-}
-
-func (p *printer) Run() {
-	for {
-		msg := <-p.msgChan
-		fmt.Println(msg)
-	}
-}
-
-func NewApp(builder builder.Builder) App {
-	printer := newPrinter()
-	return App{
+func NewApp(builder builder.Builder) *App {
+	app := &App{
 		builder:        builder,
 		sessionManager: builder.GetSessionManager(),
-		server:         builder.NewServer(printer),
-		printer:        printer,
+		printer:        make(chan string, 100),
 	}
+	app.server = builder.NewServer(app)
+	return app
 }
 
 func (a *App) Connect(addr string) error {
-	client, err := a.builder.NewClient(addr, a.printer)
+	client, err := a.builder.NewClient(addr, a)
 	if err != nil {
 		logger.Error(err)
 		return err
@@ -78,7 +61,10 @@ func (a *App) Run() {
 	}()
 
 	go func() {
-		a.printer.Run()
+		for {
+			msg := <-a.printer
+			fmt.Println(msg)
+		}
 	}()
 
 	scanner := bufio.NewScanner(os.Stdin)
@@ -92,14 +78,14 @@ func (a *App) Run() {
 			// connect to new client
 			s := strings.Split(cmd, " ")
 			if len(s) < 2 {
-				fmt.Println("invalid command:", cmd)
+				a.println("invalid command:", cmd)
 				continue
 			}
 
 			currId = s[1]
-			fmt.Println("connecting to:", currId)
+			a.println("connecting to:", currId)
 
-			_, err := a.builder.NewClient(currId, a.printer)
+			_, err := a.builder.NewClient(currId, a)
 			if err != nil {
 				logger.Debug(err)
 				continue
@@ -109,13 +95,13 @@ func (a *App) Run() {
 			// switch client
 			newId := strings.Split(cmd, " ")
 			if len(newId) < 2 {
-				fmt.Println("invalid cmd:", cmd)
+				a.println("invalid cmd:", cmd)
 				continue
 			}
 
 			newCurrId := newId[1]
 			if !a.sessionManager.ValidateId(newCurrId) {
-				fmt.Println("invalid id to switch:", newCurrId)
+				a.println("invalid id to switch:", newCurrId)
 				continue
 			}
 
@@ -123,14 +109,22 @@ func (a *App) Run() {
 
 		} else if strings.HasPrefix(cmd, "?") {
 			// display connected client
-			fmt.Printf("active ids: %v\n", a.sessionManager.GetAllIds())
+			a.printf("active ids: %v\n", a.sessionManager.GetAllIds())
 		} else {
 			if currId == "" {
-				fmt.Println("please connect to client before sending")
+				a.println("please connect to client before sending")
 				continue
 			} else {
 				a.sessionManager.Write(currId, []byte(cmd))
 			}
 		}
 	}
+}
+
+func (a *App) printf(msg string, args ...any) {
+	a.printer <- fmt.Sprintf(msg, args...)
+}
+
+func (a *App) println(msg string, args ...any) {
+	a.printer <- fmt.Sprint(msg, args)
 }
