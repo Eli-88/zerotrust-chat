@@ -26,7 +26,7 @@ func (b builder) NewServer(receiveHandler chat.ReceiveHandler) chat.Server {
 	return chat.NewServer(b.serverAddr, b.sessionManager, b.cryptoKeyFactory, receiveHandler)
 }
 
-func (b builder) NewClient(targetAddr string, receiveHandler chat.ReceiveHandler) (chat.Client, error) {
+func (b builder) NewClient(targetAddr string, receiveHandler chat.ReceiveHandler) (chat.Session, error) {
 	return chat.NewClient(b.serverAddr, targetAddr, b.cryptoKeyFactory, b.sessionManager, receiveHandler)
 }
 

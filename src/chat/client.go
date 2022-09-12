@@ -8,8 +8,6 @@ import (
 	"zerotrust_chat/logger"
 )
 
-var _ Client = &client{}
-
 type client struct {
 	buffer         []byte
 	conn           net.Conn
@@ -29,7 +27,7 @@ func NewClient(
 	keyFactory crypto.KeyFactory,
 	sessionManager SessionManager,
 	receiveHandler ReceiveHandler,
-) (Client, error) {
+) (Session, error) {
 
 	logger.Debug("connecting to:", targetAddr)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", targetAddr)
