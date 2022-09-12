@@ -5,7 +5,6 @@ import (
 	"net"
 	"zerotrust_chat/crypto"
 	"zerotrust_chat/crypto/aes"
-	"zerotrust_chat/crypto/rsa"
 	"zerotrust_chat/logger"
 )
 
@@ -99,10 +98,20 @@ func NewSession(
 func (s *session) run() error {
 	defer s.conn.Close()
 
-	err := s.handshake()
+	id, err := s.extractId()
 	if err != nil {
 		return err
 	}
+
+	s.id = id
+
+	secretKey, err := NewServerHandshake(s.conn, s.keyFactory).Handshake()
+	if err != nil {
+		return err
+	}
+	s.secretKey = secretKey
+
+	s.sessionManager.Add(s)
 	logger.Debug("handshake successful!!!")
 
 	for {
@@ -132,28 +141,6 @@ func (s *session) run() error {
 	return nil
 }
 
-func (s *session) handshake() error {
-	logger.Trace()
-
-	// extract the secret key and encrypt your reply before sending to client
-	secretKey, priKey, err := s.keyExchangeRequest()
-	if err != nil {
-		return err
-	}
-
-	err = s.startCommRequest(secretKey, priKey)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *session) internalWrite(msg []byte) error {
-	_, err := s.conn.Write(msg)
-	return err
-}
-
 func (s *session) Write(msg []byte) error {
 	encryptedMsg, err := s.secretKey.Encrypt(msg)
 	if err != nil {
@@ -181,11 +168,11 @@ func (s *session) read() ([]byte, error) {
 	return s.buffer[:n], nil
 }
 
-func (s *session) keyExchangeRequest() (string, rsa.PrivateKey, error) {
+func (s *session) extractId() (string, error) {
 	startConRequest, err := s.read()
 	if err != nil {
 		logger.Error(err)
-		return "", nil, err
+		return "", err
 	}
 
 	// extract id and save them into session manager
@@ -193,66 +180,7 @@ func (s *session) keyExchangeRequest() (string, rsa.PrivateKey, error) {
 	err = json.Unmarshal(startConRequest, &startConnectionRequest)
 	if err != nil {
 		logger.Error(err)
-		return "", nil, err
+		return "", err
 	}
-	s.id = startConnectionRequest.Id
-	s.sessionManager.Add(s)
-
-	// generate rsa key pair and send the public key to client
-	priKey, err := s.keyFactory.GenerateRsaPrivateKey()
-	if err != nil {
-		logger.Error(err)
-		return "", nil, err
-	}
-	pubKey := priKey.GetPublicKey().ToString()
-	keyRequest := keyExchangeRequest{
-		PubKey: pubKey,
-	}
-
-	req, err := json.Marshal(keyRequest)
-	if err != nil {
-		logger.Error(err)
-		return "", nil, err
-	}
-
-	logger.Debug("server sending pub key:", string(req))
-	err = s.internalWrite(req)
-	if err != nil {
-		logger.Error(err)
-		return "", nil, err
-	}
-
-	response, err := s.read()
-	if err != nil {
-		logger.Error(err)
-		return "", nil, err
-	}
-
-	logger.Debug("receiving secret:", string(response))
-
-	// extract the secret key and store in memory
-	keyResponse := keyExchangeResponse{}
-	err = json.Unmarshal(response, &keyResponse)
-	if err != nil {
-		logger.Error(err)
-		return "", nil, err
-	}
-
-	return keyResponse.SecretKey, priKey, nil
-}
-
-func (s *session) startCommRequest(secretKey string, priKey rsa.PrivateKey) error {
-	decryptedSecretKey, err := priKey.Decrypt(secretKey)
-	if err != nil {
-		logger.Error(err)
-		return err
-	}
-
-	key, err := s.keyFactory.ConstructAesSecretKey(string(decryptedSecretKey))
-	if err != nil {
-		logger.Error(err)
-		return err
-	}
-	s.secretKey = key
-	return nil
+	return startConnectionRequest.Id, nil
 }

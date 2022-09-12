@@ -44,7 +44,7 @@ func NewClient(
 		return nil, err
 	}
 
-	client, err := makeClient(
+	client := makeClient(
 		targetAddr,
 		conn,
 		keyFactory,
@@ -54,12 +54,14 @@ func NewClient(
 		return nil, err
 	}
 
-	clientHandshake := NewClientHandshake(personalId, conn, keyFactory, client.secretKey)
-	err = clientHandshake.Handshake()
+	clientHandshake := NewClientHandshake(personalId, conn, keyFactory)
+	secretKey, err := clientHandshake.Handshake()
 
 	if err != nil {
 		return nil, err
 	}
+
+	client.secretKey = secretKey
 
 	sessionManager.Add(client)
 
@@ -84,23 +86,14 @@ func makeClient(
 	conn net.Conn,
 	keyFactory crypto.KeyFactory,
 	receiveHandler ReceiveHandler,
-) (*client, error) {
-	client := &client{
+) *client {
+	return &client{
 		conn:           conn,
 		buffer:         make([]byte, 1024),
 		keyFactory:     keyFactory,
 		targetAddr:     targetAddr,
 		receiveHandler: receiveHandler,
 	}
-
-	secretKey, err := keyFactory.GenerateAesSecretKey()
-	if err != nil {
-		logger.Error(err)
-		return nil, err
-	}
-
-	client.secretKey = secretKey
-	return client, nil
 }
 
 func (c *client) Read() (string, error) {

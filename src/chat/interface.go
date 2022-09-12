@@ -1,5 +1,7 @@
 package chat
 
+import "zerotrust_chat/crypto/aes"
+
 type Server interface {
 	Run() error
 }
@@ -32,5 +34,5 @@ type HandshakeConn interface {
 }
 
 type HandShake interface {
-	Handshake() error
+	Handshake() (aes.Key, error)
 }

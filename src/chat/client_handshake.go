@@ -15,28 +15,25 @@ type clientHandshake struct {
 	conn       HandshakeConn
 	buffer     []byte
 	keyFactory crypto.KeyFactory
-	secretKey  aes.Key
 }
 
 func NewClientHandshake(
 	id string,
 	conn HandshakeConn,
 	keyFactory crypto.KeyFactory,
-	secretKey aes.Key,
 ) HandShake {
 	return &clientHandshake{
 		id:         id,
 		conn:       conn,
 		buffer:     make([]byte, 1024),
 		keyFactory: keyFactory,
-		secretKey:  secretKey,
 	}
 }
 
-func (c *clientHandshake) Handshake() error {
+func (c *clientHandshake) Handshake() (aes.Key, error) {
 	pubKey, err := c.pubKeyRequest(c.id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	return c.shareSecretKey(pubKey)
@@ -78,19 +75,24 @@ func (c *clientHandshake) pubKeyRequest(id string) (rsa.PublicKey, error) {
 	)
 }
 
-func (c *clientHandshake) shareSecretKey(pubKey rsa.PublicKey) error {
-
-	cipherSecretKey, err := pubKey.Encrypt([]byte(c.secretKey.ToString()))
+func (c *clientHandshake) shareSecretKey(pubKey rsa.PublicKey) (aes.Key, error) {
+	secretKey, err := c.keyFactory.GenerateAesSecretKey()
 	if err != nil {
 		logger.Error(err)
-		return err
+		return nil, err
+	}
+
+	cipherSecretKey, err := pubKey.Encrypt([]byte(secretKey.ToString()))
+	if err != nil {
+		logger.Error(err)
+		return nil, err
 	}
 	keyExchangeResponse := keyExchangeResponse{SecretKey: cipherSecretKey}
 
 	request, err := json.Marshal(keyExchangeResponse)
 	if err != nil {
 		logger.Error(err)
-		return err
+		return nil, err
 	}
 
 	logger.Debug("sharing secret:", string(request))
@@ -98,10 +100,10 @@ func (c *clientHandshake) shareSecretKey(pubKey rsa.PublicKey) error {
 	err = c.write(request)
 	if err != nil {
 		logger.Error(err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	return secretKey, nil
 }
 
 func (c *clientHandshake) write(msg []byte) error {
