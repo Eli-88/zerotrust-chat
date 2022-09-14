@@ -36,6 +36,7 @@ func (s *serverHandshake) Handshake() (aes.Key, error) {
 }
 
 func (s *serverHandshake) keyExchangeRequest() (string, rsa.PrivateKey, error) {
+	logger.Trace()
 	// generate rsa key pair and send the public key to client
 	priKey, err := s.keyFactory.GenerateRsaPrivateKey()
 	if err != nil {
@@ -80,6 +81,7 @@ func (s *serverHandshake) keyExchangeRequest() (string, rsa.PrivateKey, error) {
 }
 
 func (s *serverHandshake) startCommRequest(secretKey string, priKey rsa.PrivateKey) (aes.Key, error) {
+	logger.Trace()
 	decryptedSecretKey, err := priKey.Decrypt(secretKey)
 	if err != nil {
 		logger.Error(err)
@@ -100,9 +102,5 @@ func (s *serverHandshake) write(msg []byte) error {
 }
 
 func (s *serverHandshake) read() ([]byte, error) {
-	n, err := s.conn.Read(s.buffer)
-	if err != nil {
-		return nil, err
-	}
-	return s.buffer[:n], nil
+	return s.conn.Read(s.buffer)
 }

@@ -100,12 +100,14 @@ func (s *session) run() error {
 
 	id, err := s.extractId()
 	if err != nil {
+		logger.Error(err)
 		return err
 	}
 
 	s.id = id
 
-	secretKey, err := NewServerHandshake(s.conn, s.keyFactory).Handshake()
+	serverHandsake := NewServerHandshake(MakeHandshakeConn(s.conn), s.keyFactory)
+	secretKey, err := serverHandsake.Handshake()
 	if err != nil {
 		return err
 	}
@@ -163,6 +165,7 @@ func (s *session) Write(msg []byte) error {
 func (s *session) read() ([]byte, error) {
 	n, err := s.conn.Read(s.buffer)
 	if err != nil {
+		logger.Error(err)
 		return nil, err
 	}
 	return s.buffer[:n], nil

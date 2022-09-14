@@ -2,6 +2,14 @@ package chat
 
 import "zerotrust_chat/crypto/aes"
 
+//go:generate mockgen -destination=../test/mocks/mock_server.go -package=mocks zerotrust_chat/chat Server
+//go:generate mockgen -destination=../test/mocks/mock_session.go -package=mocks zerotrust_chat/chat Session
+//go:generate mockgen -destination=../test/mocks/mock_sessionmanager.go -package=mocks zerotrust_chat/chat SessionManager
+//go:generate mockgen -destination=../test/mocks/mock_receivehandler.go -package=mocks zerotrust_chat/chat ReceiveHandler
+//go:generate mockgen -destination=../test/mocks/mock_handshakeconn.go -package=mocks zerotrust_chat/chat HandshakeConn
+//go:generate mockgen -destination=../test/mocks/mock_handshake.go -package=mocks zerotrust_chat/chat HandShake
+//go:generate mockgen -destination=../test/mocks/mock_handshakeconnfactory.go -package=mocks zerotrust_chat/chat HandshakeConnFactory
+
 type Server interface {
 	Run() error
 }
@@ -24,8 +32,8 @@ type ReceiveHandler interface {
 }
 
 type HandshakeConn interface {
-	Read(b []byte) (n int, err error)
-	Write(b []byte) (n int, err error)
+	Read(b []byte) ([]byte, error)
+	Write(b []byte) (int, error)
 }
 
 type HandShake interface {

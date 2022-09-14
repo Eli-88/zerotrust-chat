@@ -50,7 +50,8 @@ func (c *clientHandshake) pubKeyRequest(id string) (rsa.PublicKey, error) {
 		return nil, err
 	}
 
-	_, err = c.conn.Write(startRequest)
+	logger.Debug("writing start request:", string(startRequest))
+	err = c.write(startRequest)
 
 	if err != nil {
 		logger.Error(err)
@@ -112,9 +113,5 @@ func (c *clientHandshake) write(msg []byte) error {
 }
 
 func (c *clientHandshake) read() ([]byte, error) {
-	numByte, err := c.conn.Read(c.buffer)
-	if err != nil {
-		return nil, err
-	}
-	return c.buffer[:numByte], nil
+	return c.conn.Read(c.buffer)
 }
