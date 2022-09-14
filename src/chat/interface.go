@@ -8,7 +8,6 @@ import "zerotrust_chat/crypto/aes"
 //go:generate mockgen -destination=../test/mocks/mock_receivehandler.go -package=mocks zerotrust_chat/chat ReceiveHandler
 //go:generate mockgen -destination=../test/mocks/mock_handshakeconn.go -package=mocks zerotrust_chat/chat HandshakeConn
 //go:generate mockgen -destination=../test/mocks/mock_handshake.go -package=mocks zerotrust_chat/chat HandShake
-//go:generate mockgen -destination=../test/mocks/mock_handshakeconnfactory.go -package=mocks zerotrust_chat/chat HandshakeConnFactory
 
 type Server interface {
 	Run() error
