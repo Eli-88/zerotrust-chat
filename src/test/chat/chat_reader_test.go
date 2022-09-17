@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"testing"
 	"zerotrust_chat/chat"
@@ -26,7 +27,10 @@ func TestReadSingleChatMessage(t *testing.T) {
 	}
 	msgBody, _ := json.Marshal(chatBody)
 
-	msg := []byte{byte(0x01), byte(len(msgBody))}
+	msg := []byte{byte(0x01)}
+	msgLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(msgLen, uint32(len(msgBody)))
+	msg = append(msg, msgLen...)
 	msg = append(msg, msgBody...)
 
 	chatReader := chat.NewChatReaderWriter(secretKey, mockConn)
@@ -50,7 +54,10 @@ func TestReadDoubleChatMessageOnlyFirstValid(t *testing.T) {
 		Data: cipherText,
 	}
 	msgBody, _ := json.Marshal(chatBody)
-	msg := []byte{byte(0x01), byte(len(msgBody))}
+	msgLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(msgLen, uint32(len(msgBody)))
+	msg := []byte{byte(0x01)}
+	msg = append(msg, msgLen...)
 	msg = append(msg, msgBody...)
 
 	// invalid second message setup
@@ -83,7 +90,10 @@ func TestReadMultipleChatMessage(t *testing.T) {
 		Data: cipherText1,
 	}
 	msgBody, _ := json.Marshal(chatBody)
-	msg := []byte{byte(0x01), byte(len(msgBody))}
+	msgLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(msgLen, uint32(len(msgBody)))
+	msg := []byte{byte(0x01)}
+	msg = append(msg, msgLen...)
 	msg = append(msg, msgBody...)
 
 	// valid second message setup
@@ -93,7 +103,10 @@ func TestReadMultipleChatMessage(t *testing.T) {
 		Data: cipherText2,
 	}
 	msgBody2, _ := json.Marshal(chatBody2)
-	msg = append(msg, []byte{0x01, byte(len(msgBody2))}...)
+
+	msg = append(msg, byte(0x01))
+	binary.LittleEndian.PutUint32(msgLen, uint32(len(msgBody2)))
+	msg = append(msg, msgLen...)
 	msg = append(msg, msgBody2...)
 
 	chatReader := chat.NewChatReaderWriter(secretKey, mockConn)
@@ -115,7 +128,10 @@ func TestReadFirstChatMessageFail(t *testing.T) {
 	// invalid first message setup
 
 	msgBody := []byte("invalid")
-	msg := []byte{byte(0x01), byte(len(msgBody))}
+	msgLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(msgLen, uint32(len(msgBody)))
+	msg := []byte{byte(0x01)}
+	msg = append(msg, msgLen...)
 	msg = append(msg, msgBody...)
 
 	// valid second message setup

@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"zerotrust_chat/crypto/aes"
@@ -36,20 +37,20 @@ func (c chatReaderWriterFactory) Create(secretKey aes.Key, conn Conn) ChatReader
 func (c chatReaderWriter) Read(msg []byte) ([]ChatMessage, error) {
 	logger.Debug("read msg:", string(msg))
 	var result []ChatMessage
-	for len(msg) > 2 {
+	for len(msg) > 5 {
 		// parse chat message header
 		id := msg[0]
-		msgLen := int(msg[1])
+		msgLen := binary.LittleEndian.Uint32(msg[1:5])
 		logger.Debug("id:", id, " msglen:", msgLen)
 
 		if id != 0x01 {
 			break
 		}
 
-		msg = msg[2:] // offset slice to start of chat body
+		msg = msg[5:] // offset slice to start of chat body
 
 		// check len of chat body
-		if len(msg) < msgLen {
+		if uint32(len(msg)) < msgLen {
 			break
 		}
 
@@ -65,6 +66,7 @@ func (c chatReaderWriter) Read(msg []byte) ([]ChatMessage, error) {
 			break
 		}
 		chatMessage.Data = string(decryptData)
+		logger.Debug("decrypted chat message:", chatMessage.Data)
 		result = append(result, chatMessage)
 
 		msg = msg[msgLen:] // offset slice to next chat header
@@ -93,7 +95,10 @@ func (c *chatReaderWriter) Write(msg []byte) error {
 		return err
 	}
 
-	response := []byte{0x01, byte(len(chatMsg))}
+	msgLen := make([]byte, 4)
+	binary.LittleEndian.PutUint32(msgLen, uint32(len(chatMsg)))
+	response := []byte{0x01}
+	response = append(response, msgLen...)
 	response = append(response, chatMsg...)
 
 	logger.Debug("chat writer send:", string(response))
