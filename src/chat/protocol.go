@@ -1,10 +1,10 @@
 package chat
 
-type keyExchangeRequest struct {
+type KeyExchangeRequest struct {
 	PubKey string `json:"public_key"`
 }
 
-type keyExchangeResponse struct {
+type KeyExchangeResponse struct {
 	SecretKey string `json:"secret_key"`
 }
 

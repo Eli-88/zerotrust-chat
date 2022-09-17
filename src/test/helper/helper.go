@@ -15,11 +15,3 @@ func GenerateRandPlainText(size int) []byte {
 func CompareByteSlices(a, b []byte) bool {
 	return bytes.Equal(a, b)
 }
-
-type KeyExchangeRequest struct {
-	PubKey string `json:"public_key"`
-}
-
-type KeyExchangeResponse struct {
-	SecretKey string `json:"secret_key"`
-}

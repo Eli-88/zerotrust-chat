@@ -64,7 +64,7 @@ func (c *clientHandshake) pubKeyRequest(id string) (rsa.PublicKey, error) {
 		return nil, err
 	}
 
-	keyExchangeRequest := keyExchangeRequest{}
+	keyExchangeRequest := KeyExchangeRequest{}
 	err = json.Unmarshal(resp, &keyExchangeRequest)
 	if err != nil {
 		logger.Error(err)
@@ -88,7 +88,7 @@ func (c *clientHandshake) shareSecretKey(pubKey rsa.PublicKey) (aes.Key, error) 
 		logger.Error(err)
 		return nil, err
 	}
-	keyExchangeResponse := keyExchangeResponse{SecretKey: cipherSecretKey}
+	keyExchangeResponse := KeyExchangeResponse{SecretKey: cipherSecretKey}
 
 	request, err := json.Marshal(keyExchangeResponse)
 	if err != nil {

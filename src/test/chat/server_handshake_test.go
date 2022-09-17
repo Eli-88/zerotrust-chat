@@ -6,7 +6,6 @@ import (
 	"zerotrust_chat/chat"
 	"zerotrust_chat/crypto/aes"
 	"zerotrust_chat/crypto/rsa"
-	test "zerotrust_chat/test/helper"
 	"zerotrust_chat/test/mocks"
 
 	"github.com/golang/mock/gomock"
@@ -21,13 +20,13 @@ func TestServerHandshake(t *testing.T) {
 	priKey, _ := rsa.GeneratePrivateKey()
 	secretKey, _ := aes.GenerateKey()
 
-	keyRequest := test.KeyExchangeRequest{
+	keyRequest := chat.KeyExchangeRequest{
 		PubKey: priKey.GetPublicKey().ToString(),
 	}
 	req, _ := json.Marshal(keyRequest)
 
 	encryptedSecretKey, _ := priKey.GetPublicKey().Encrypt([]byte(secretKey.ToString()))
-	keyResponse := test.KeyExchangeResponse{
+	keyResponse := chat.KeyExchangeResponse{
 		SecretKey: encryptedSecretKey,
 	}
 	res, _ := json.Marshal(keyResponse)

@@ -44,7 +44,7 @@ func (s *serverHandshake) keyExchangeRequest() (string, rsa.PrivateKey, error) {
 		return "", nil, err
 	}
 	pubKey := priKey.GetPublicKey().ToString()
-	keyRequest := keyExchangeRequest{
+	keyRequest := KeyExchangeRequest{
 		PubKey: pubKey,
 	}
 
@@ -70,7 +70,7 @@ func (s *serverHandshake) keyExchangeRequest() (string, rsa.PrivateKey, error) {
 	logger.Debug("receiving secret:", string(response))
 
 	// extract the secret key and store in memory
-	keyResponse := keyExchangeResponse{}
+	keyResponse := KeyExchangeResponse{}
 	err = json.Unmarshal(response, &keyResponse)
 	if err != nil {
 		logger.Error(err)
