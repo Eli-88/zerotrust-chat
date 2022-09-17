@@ -12,20 +12,23 @@ var _ Server = &server{}
 var _ Session = &session{}
 
 type server struct {
-	ipAddr          string
-	sessionManager  SessionManager
-	keyFactory      crypto.KeyFactory
-	receiverHandler ReceiveHandler
+	ipAddr                  string
+	sessionManager          SessionManager
+	keyFactory              crypto.KeyFactory
+	receiverHandler         ReceiveHandler
+	chatReaderWriterFactory ChatReaderWriterFactory
 }
 
 type session struct {
-	id             string
-	conn           net.Conn
-	buffer         []byte
-	keyFactory     crypto.KeyFactory
-	secretKey      aes.Key
-	sessionManager SessionManager
-	receiveHandler ReceiveHandler
+	id                      string
+	conn                    net.Conn
+	buffer                  []byte
+	keyFactory              crypto.KeyFactory
+	secretKey               aes.Key
+	sessionManager          SessionManager
+	receiveHandler          ReceiveHandler
+	chatReaderWriterFactory ChatReaderWriterFactory
+	chatReaderWriter        ChatReaderWriter
 }
 
 func (s session) GetId() string {
@@ -37,12 +40,14 @@ func NewServer(
 	sessionManager SessionManager,
 	keyFactory crypto.KeyFactory,
 	receiveHandler ReceiveHandler,
+	chatReaderWriterFactory ChatReaderWriterFactory,
 ) Server {
 	return &server{
-		ipAddr:          ipAddr,
-		sessionManager:  sessionManager,
-		keyFactory:      keyFactory,
-		receiverHandler: receiveHandler,
+		ipAddr:                  ipAddr,
+		sessionManager:          sessionManager,
+		keyFactory:              keyFactory,
+		receiverHandler:         receiveHandler,
+		chatReaderWriterFactory: chatReaderWriterFactory,
 	}
 }
 
@@ -69,6 +74,7 @@ func (s server) onConnection(conn net.Conn) {
 		s.keyFactory,
 		s.sessionManager,
 		s.receiverHandler,
+		s.chatReaderWriterFactory,
 	)
 	err := session.run() // blocking run, return when connection closes
 	if err != nil {
@@ -83,15 +89,18 @@ func NewSession(
 	keyFactory crypto.KeyFactory,
 	sessionManager SessionManager,
 	receiveHandler ReceiveHandler,
+	chatReaderWriterFactory ChatReaderWriterFactory,
 ) *session {
 	return &session{
-		id:             "",
-		conn:           conn,
-		buffer:         make([]byte, 1024),
-		keyFactory:     keyFactory,
-		secretKey:      nil,
-		sessionManager: sessionManager,
-		receiveHandler: receiveHandler,
+		id:                      "",
+		conn:                    conn,
+		buffer:                  make([]byte, 1024),
+		keyFactory:              keyFactory,
+		secretKey:               nil,
+		sessionManager:          sessionManager,
+		receiveHandler:          receiveHandler,
+		chatReaderWriterFactory: chatReaderWriterFactory,
+		chatReaderWriter:        nil,
 	}
 }
 
@@ -106,7 +115,7 @@ func (s *session) run() error {
 
 	s.id = id
 
-	serverHandsake := NewServerHandshake(MakeHandshakeConn(s.conn), s.keyFactory)
+	serverHandsake := NewServerHandshake(NewConn(s.conn), s.keyFactory)
 	secretKey, err := serverHandsake.Handshake()
 	if err != nil {
 		return err
@@ -116,67 +125,35 @@ func (s *session) run() error {
 	s.sessionManager.Add(s)
 	logger.Debug("handshake successful!!!")
 
+	s.chatReaderWriter = s.chatReaderWriterFactory.Create(s.secretKey, NewConn(s.conn))
 	for {
 		numBytes, err := s.conn.Read(s.buffer)
 		if err != nil {
 			logger.Debug(err)
 			break
 		}
-
-		msg := ChatMessage{}
-		err = json.Unmarshal(s.buffer[:numBytes], &msg)
+		msg, err := s.chatReaderWriter.Read(s.buffer[:numBytes])
 		if err != nil {
 			logger.Debug(err)
 			break
 		}
-
-		data, err := s.secretKey.Decrypt(msg.Data)
-		if err != nil {
-			logger.Debug(err)
-			break
-		}
-		dataCpy := make([]byte, len(data))
-		copy(dataCpy, data)
-		s.receiveHandler.OnReceive(string(dataCpy))
+		s.receiveHandler.OnReceive(msg)
 	}
 
 	return nil
 }
 
 func (s *session) Write(msg []byte) error {
-	encryptedMsg, err := s.secretKey.Encrypt(msg)
-	if err != nil {
-		return err
-	}
-
-	chatMessage := ChatMessage{
-		Data: encryptedMsg,
-	}
-
-	toBeSent, err := json.Marshal(chatMessage)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.conn.Write(toBeSent)
-	return err
-}
-
-func (s *session) read() ([]byte, error) {
-	n, err := s.conn.Read(s.buffer)
-	if err != nil {
-		logger.Error(err)
-		return nil, err
-	}
-	return s.buffer[:n], nil
+	return s.chatReaderWriter.Write(msg)
 }
 
 func (s *session) extractId() (string, error) {
-	startConRequest, err := s.read()
+	numBytes, err := s.conn.Read(s.buffer)
 	if err != nil {
 		logger.Error(err)
 		return "", err
 	}
+	startConRequest := s.buffer[:numBytes]
 
 	// extract id and save them into session manager
 	startConnectionRequest := startConnectionRequest{}

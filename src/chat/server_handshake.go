@@ -11,12 +11,12 @@ import (
 var _ HandShake = &serverHandshake{}
 
 type serverHandshake struct {
-	conn       HandshakeConn
+	conn       Conn
 	keyFactory crypto.KeyFactory
 	buffer     []byte
 }
 
-func NewServerHandshake(conn HandshakeConn, keyFactory crypto.KeyFactory) HandShake {
+func NewServerHandshake(conn Conn, keyFactory crypto.KeyFactory) HandShake {
 	return &serverHandshake{
 		conn:       conn,
 		keyFactory: keyFactory,

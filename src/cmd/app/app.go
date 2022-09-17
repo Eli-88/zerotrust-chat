@@ -20,8 +20,13 @@ type App struct {
 	printer        chan string
 }
 
-func (a *App) OnReceive(msg string) {
-	a.printer <- msg
+func (a *App) OnReceive(messages []chat.ChatMessage) {
+	if messages == nil {
+		logger.Fatal("chat messages is not supposed to be nil, shld be handled before calling this method")
+	}
+	for _, msg := range messages {
+		a.printer <- msg.Data
+	}
 }
 
 func NewApp(builder builder.Builder) *App {

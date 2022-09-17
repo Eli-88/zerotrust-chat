@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"encoding/json"
 	"net"
 	"zerotrust_chat/crypto"
 	"zerotrust_chat/crypto/aes"
@@ -9,12 +8,13 @@ import (
 )
 
 type client struct {
-	buffer         []byte
-	conn           net.Conn
-	keyFactory     crypto.KeyFactory
-	secretKey      aes.Key
-	targetAddr     string
-	receiveHandler ReceiveHandler
+	buffer           []byte
+	conn             net.Conn
+	keyFactory       crypto.KeyFactory
+	secretKey        aes.Key
+	targetAddr       string
+	receiveHandler   ReceiveHandler
+	chatReaderWriter ChatReaderWriter
 }
 
 func (c client) GetId() string {
@@ -27,6 +27,7 @@ func NewClient(
 	keyFactory crypto.KeyFactory,
 	sessionManager SessionManager,
 	receiveHandler ReceiveHandler,
+	chatReaderWriterFactory ChatReaderWriterFactory,
 ) (Session, error) {
 
 	logger.Debug("connecting to:", targetAddr)
@@ -45,7 +46,7 @@ func NewClient(
 	if conn == nil {
 		logger.Fatal("conn cannot be nil")
 	}
-	clientHandshake := NewClientHandshake(personalId, MakeHandshakeConn(conn), keyFactory)
+	clientHandshake := NewClientHandshake(personalId, NewConn(conn), keyFactory)
 	secretKey, err := clientHandshake.Handshake()
 
 	if err != nil {
@@ -57,6 +58,7 @@ func NewClient(
 		keyFactory,
 		receiveHandler,
 		secretKey,
+		chatReaderWriterFactory.Create(secretKey, NewConn(conn)),
 	)
 
 	sessionManager.Add(client)
@@ -68,9 +70,7 @@ func NewClient(
 				logger.Debug(err)
 				break
 			}
-			msgCpy := make([]byte, len(msg))
-			copy(msgCpy, msg)
-			client.receiveHandler.OnReceive(string(msgCpy))
+			client.receiveHandler.OnReceive(msg)
 		}
 	}()
 
@@ -83,48 +83,28 @@ func makeClient(
 	keyFactory crypto.KeyFactory,
 	receiveHandler ReceiveHandler,
 	secretKey aes.Key,
+	chatReaderWriter ChatReaderWriter,
 ) *client {
 	return &client{
-		conn:           conn,
-		buffer:         make([]byte, 1024),
-		keyFactory:     keyFactory,
-		targetAddr:     targetAddr,
-		receiveHandler: receiveHandler,
-		secretKey:      secretKey,
+		conn:             conn,
+		buffer:           make([]byte, 1024),
+		keyFactory:       keyFactory,
+		targetAddr:       targetAddr,
+		receiveHandler:   receiveHandler,
+		secretKey:        secretKey,
+		chatReaderWriter: chatReaderWriter,
 	}
 }
 
-func (c *client) Read() (string, error) {
+func (c *client) Read() ([]ChatMessage, error) {
 	numByte, err := c.conn.Read(c.buffer)
 	if err != nil {
-		return "", err
+		logger.Debug(err)
+		return nil, err
 	}
-
-	chatMessage := ChatMessage{}
-	json.Unmarshal(c.buffer[:numByte], &chatMessage)
-
-	recvMsg, err := c.secretKey.Decrypt(chatMessage.Data)
-
-	if err != nil {
-		return "", err
-	}
-	return string(recvMsg), nil
+	return c.chatReaderWriter.Read(c.buffer[:numByte])
 }
 
 func (c *client) Write(msg []byte) error {
-	encryptedMsg, err := c.secretKey.Encrypt(msg)
-	if err != nil {
-		return err
-	}
-
-	chatMessage := ChatMessage{
-		Data: encryptedMsg,
-	}
-	msgToBeSent, err := json.Marshal(chatMessage)
-
-	if err != nil {
-		return err
-	}
-	_, err = c.conn.Write(msgToBeSent)
-	return err
+	return c.chatReaderWriter.Write(msg)
 }

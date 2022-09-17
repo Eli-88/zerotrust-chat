@@ -8,6 +8,7 @@ import "zerotrust_chat/crypto/aes"
 //go:generate mockgen -destination=../test/mocks/mock_receivehandler.go -package=mocks zerotrust_chat/chat ReceiveHandler
 //go:generate mockgen -destination=../test/mocks/mock_handshakeconn.go -package=mocks zerotrust_chat/chat HandshakeConn
 //go:generate mockgen -destination=../test/mocks/mock_handshake.go -package=mocks zerotrust_chat/chat HandShake
+//go:generate mockgen -destination=../test/mocks/mock_chat_reader.go -package=mocks zerotrust_chat/chat ChatReader
 
 type Server interface {
 	Run() error
@@ -27,14 +28,23 @@ type SessionManager interface {
 }
 
 type ReceiveHandler interface {
-	OnReceive(string)
+	OnReceive([]ChatMessage)
 }
 
-type HandshakeConn interface {
+type Conn interface {
 	Read(b []byte) ([]byte, error)
 	Write(b []byte) (int, error)
 }
 
 type HandShake interface {
 	Handshake() (aes.Key, error)
+}
+
+type ChatReaderWriter interface {
+	Read([]byte) ([]ChatMessage, error)
+	Write(msg []byte) error
+}
+
+type ChatReaderWriterFactory interface {
+	Create(aes.Key, Conn) ChatReaderWriter
 }

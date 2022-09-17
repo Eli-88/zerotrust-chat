@@ -12,14 +12,14 @@ var _ HandShake = &clientHandshake{}
 
 type clientHandshake struct {
 	id         string
-	conn       HandshakeConn
+	conn       Conn
 	buffer     []byte
 	keyFactory crypto.KeyFactory
 }
 
 func NewClientHandshake(
 	id string,
-	conn HandshakeConn,
+	conn Conn,
 	keyFactory crypto.KeyFactory,
 ) HandShake {
 	return &clientHandshake{
